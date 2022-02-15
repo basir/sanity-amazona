@@ -14,3 +14,6 @@
 3. Create Next App
    1. npx create-next-app
    2. add @mui library
+4. Publish to github
+   1. create githb account
+   2. push to github from vs code
