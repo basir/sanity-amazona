@@ -16,6 +16,7 @@ import axios from 'axios';
 import { Store } from '../utils/Store';
 import { useRouter } from 'next/router';
 import jsCookie from 'js-cookie';
+import { getError } from '../utils/error';
 
 export default function LoginScreen() {
   const { state, dispatch } = useContext(Store);
@@ -43,7 +44,7 @@ export default function LoginScreen() {
       jsCookie.set('userInfo', JSON.stringify(data));
       router.push('/');
     } catch (err) {
-      enqueueSnackbar(err.message, { variant: 'error' });
+      enqueueSnackbar(getError(err), { variant: 'error' });
     }
   };
   return (
