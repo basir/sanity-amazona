@@ -65,3 +65,8 @@
     1. create login api
     2. use login api in login screen
     3. implement logout
+16. Create Shipping Screen
+    1. create shipping component
+    2. get address fields
+    3. implement submit handler
+    4. handle redirect
