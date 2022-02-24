@@ -74,3 +74,8 @@
     1. create payment component
     2. get payment method
     3. implement submit handler
+18. Create Place Order Screen
+    1. create place order component
+    2. preview order
+    3. create order model in sanity
+    4. create order on place order click handler
