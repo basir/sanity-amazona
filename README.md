@@ -70,3 +70,7 @@
     2. get address fields
     3. implement submit handler
     4. handle redirect
+17. Create Payment Screen
+    1. create payment component
+    2. get payment method
+    3. implement submit handler
