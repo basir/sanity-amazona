@@ -1,5 +1,6 @@
 import {
   Alert,
+  Box,
   Card,
   CircularProgress,
   Grid,
@@ -18,12 +19,14 @@ import NextLink from 'next/link';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import React, { useContext, useEffect, useReducer } from 'react';
+import { PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js';
 import Layout from '../../components/Layout';
 import classes from '../../utils/classes';
 import { Store } from '../../utils/Store';
 import { useRouter } from 'next/router';
 import { getError } from '../../utils/error';
 import axios from 'axios';
+import { useSnackbar } from 'notistack';
 
 function reducer(state, action) {
   switch (action.type) {
@@ -33,15 +36,27 @@ function reducer(state, action) {
       return { ...state, loading: false, order: action.payload, error: '' };
     case 'FETCH_FAIL':
       return { ...state, loading: false, error: action.payload };
+    case 'PAY_REQUEST':
+      return { ...state, loadingPay: true };
+    case 'PAY_SUCCESS':
+      return { ...state, loadingPay: false, successPay: true };
+    case 'PAY_FAIL':
+      return { ...state, loadingPay: false, errorPay: action.payload };
+    case 'PAY_RESET':
+      return { ...state, loadingPay: false, successPay: false, errorPay: '' };
   }
 }
 function OrderScreen({ params }) {
+  const { enqueueSnackbar } = useSnackbar();
   const { id: orderId } = params;
-  const [{ loading, error, order }, dispatch] = useReducer(reducer, {
-    loading: true,
-    order: {},
-    error: '',
-  });
+  const [{ loading, error, order, successPay }, dispatch] = useReducer(
+    reducer,
+    {
+      loading: true,
+      order: {},
+      error: '',
+    }
+  );
 
   const {
     shippingAddress,
@@ -61,6 +76,8 @@ function OrderScreen({ params }) {
   const { state } = useContext(Store);
   const { userInfo } = state;
 
+  const [{ isPending }, paypalDispatch] = usePayPalScriptReducer();
+
   useEffect(() => {
     if (!userInfo) {
       return router.push('/login');
@@ -77,8 +94,65 @@ function OrderScreen({ params }) {
         dispatch({ type: 'FETCH_FAIL', payload: getError(err) });
       }
     };
-    fetchOrder();
-  }, [orderId, router, userInfo]);
+    if (!order._id || successPay || (order._id && order._id !== orderId)) {
+      fetchOrder();
+      if (successPay) {
+        dispatch({ type: 'PAY_RESET' });
+      }
+    } else {
+      const loadPaypalScript = async () => {
+        const { data: clientId } = await axios.get('/api/keys/paypal', {
+          headers: { authorization: `Bearer ${userInfo.token}` },
+        });
+        paypalDispatch({
+          type: 'resetOptions',
+          value: {
+            'client-id': clientId,
+            currency: 'USD',
+          },
+        });
+        paypalDispatch({ type: 'setLoadingStatus', value: 'pending' });
+      };
+      loadPaypalScript();
+    }
+  }, [order, orderId, successPay, paypalDispatch, router, userInfo]);
+
+  function createOrder(data, actions) {
+    return actions.order
+      .create({
+        purchase_units: [
+          {
+            amount: { value: totalPrice },
+          },
+        ],
+      })
+      .then((orderID) => {
+        return orderID;
+      });
+  }
+  function onApprove(data, actions) {
+    return actions.order.capture().then(async function (details) {
+      try {
+        dispatch({ type: 'PAY_REQUEST' });
+        const { data } = await axios.put(
+          `/api/orders/${order._id}/pay`,
+          details,
+          {
+            headers: { authorization: `Bearer ${userInfo.token}` },
+          }
+        );
+        dispatch({ type: 'PAY_SUCCESS', payload: data });
+        enqueueSnackbar('Order is paid', { variant: 'success' });
+      } catch (err) {
+        dispatch({ type: 'PAY_FAIL', payload: getError(err) });
+        enqueueSnackbar(getError(err), { variant: 'error' });
+      }
+    });
+  }
+  function onError(err) {
+    enqueueSnackbar(getError(err), { variant: 'error' });
+  }
+
   return (
     <Layout title={`Order ${orderId}`}>
       <Typography component="h1" variant="h1">
@@ -232,6 +306,21 @@ function OrderScreen({ params }) {
                     </Grid>
                   </Grid>
                 </ListItem>
+                {!isPaid && (
+                  <ListItem>
+                    {isPending ? (
+                      <CircularProgress />
+                    ) : (
+                      <Box sx={classes.fullWidth}>
+                        <PayPalButtons
+                          createOrder={createOrder}
+                          onApprove={onApprove}
+                          onError={onError}
+                        ></PayPalButtons>
+                      </Box>
+                    )}
+                  </ListItem>
+                )}
               </List>
             </Card>
           </Grid>
