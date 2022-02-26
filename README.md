@@ -104,3 +104,8 @@
     1. create search screen
     2. implement search filters
     3. list products
+24. Publish on Vercel
+    1. create vercel account
+    2. connect it to gitub
+    3. add vercel domain to allow origin in sanity
+    4. publish result
